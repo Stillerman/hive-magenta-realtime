@@ -384,23 +384,6 @@ body {
   font-size: 0.8rem;
 }
 
-.empty-score {
-  width: min(38rem, 100%);
-  color: var(--quiet);
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  padding: clamp(2rem, 8vh, 5rem) 1.5rem;
-  text-align: center;
-}
-
-.empty-mark {
-  margin-bottom: 0.45rem;
-  color: var(--muted);
-  font-size: clamp(2rem, 5vw, 4.5rem);
-  font-weight: 430;
-  letter-spacing: 0;
-}
-
 .join-panel {
   align-self: stretch;
   display: flex;
@@ -440,6 +423,30 @@ body {
 .qr-frame.closed {
   background: transparent;
   border-style: dashed;
+}
+
+.qr-gate {
+  display: grid;
+  place-items: center;
+  width: min(100%, 18rem);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+.open-join-btn {
+  width: min(10rem, 72%);
+  min-height: 3.25rem;
+  border-color: rgba(238, 232, 219, 0.28);
+  background: rgba(238, 232, 219, 0.92);
+  box-shadow: 0 0 0 1px rgba(238, 232, 219, 0.04), 0 1.2rem 3rem rgba(0, 0, 0, 0.26);
+  letter-spacing: 0.02em;
+}
+
+.open-join-btn:hover,
+.open-join-btn:focus-visible {
+  background: var(--ink);
+  border-color: rgba(238, 232, 219, 0.46);
+  outline: none;
 }
 
 .qr-locked {

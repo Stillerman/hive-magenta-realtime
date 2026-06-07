@@ -11,6 +11,7 @@ const voiceColor = (id: number) => VOICE_COLORS[Math.abs(id) % VOICE_COLORS.leng
 export function Board() {
   const [s, setState] = useState<BoardState | null>(null);
   const [panel, setPanel] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
   const levelRef = useRef(0);
 
   useEffect(() => subscribeBoard((st) => { setState(st); levelRef.current = st.level; }), []);
@@ -33,6 +34,12 @@ export function Board() {
   const hiddenCount = Math.max(0, activeCount - ensemble.length);
   const level = Math.min(100, s.level * 300);
   const anchorVisible = activeCount === 0 && Boolean(s.anchor);
+  const showJoin = s.tunnel_open && joinOpen;
+
+  const openJoin = () => {
+    setJoinOpen(true);
+    if (!s.tunnel_open) void api.control("open_tunnel");
+  };
 
   return (
     <div className="board">
@@ -137,12 +144,6 @@ export function Board() {
             </div>
           )}
 
-          {top.length === 0 && (
-            <div className="empty-score">
-              <div className="empty-mark">anchor only</div>
-              <div>{s.tunnel_open ? "waiting for the room" : "open the room to begin"}</div>
-            </div>
-          )}
         </section>
 
         <aside className="join-panel">
@@ -151,15 +152,13 @@ export function Board() {
             <span>{s.running ? "audio on" : "audio off"}</span>
           </div>
 
-          {!s.tunnel_open ? (
+          {!showJoin ? (
             <>
-              <div className="qr-frame closed">
-                <div className="qr-locked">room closed</div>
+              <div className="qr-gate">
+                <button className="primary-btn open-join-btn" onClick={openJoin}>
+                  Open
+                </button>
               </div>
-              <button className="primary-btn" onClick={() => api.control("open_tunnel")}>
-                Open room
-              </button>
-              <div className="muted-copy">QR will appear here.</div>
             </>
           ) : (
             <>

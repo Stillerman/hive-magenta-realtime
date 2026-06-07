@@ -25,15 +25,16 @@
   .cell { position:relative; min-width:0; border:1px solid rgba(238,232,219,.1); border-radius:6px; background:var(--field); color:var(--muted); padding:0 .45rem; overflow:hidden; line-height:1.7rem; font-size:.78rem; text-overflow:ellipsis; white-space:nowrap; }
   #side { display:flex; flex-direction:column; gap:1rem; min-height:0; padding-left:1.6rem; border-left:1px solid var(--line); }
   .top { display:flex; justify-content:space-between; gap:1rem; }
-  #qr { display:grid; place-items:center; width:min(100%,18rem); aspect-ratio:1; margin:0 auto; padding:.8rem; background:#f5f0e7; border:1px solid var(--line); border-radius:8px; }
+  #qr { display:none; place-items:center; width:min(100%,18rem); aspect-ratio:1; margin:0 auto; padding:.8rem; background:#f5f0e7; border:1px solid var(--line); border-radius:8px; }
   #qr.closed { background:transparent; border-style:dashed; }
   #qr img { width:100%; height:100%; image-rendering:pixelated; }
+  #qrgate { display:grid; place-items:center; width:min(100%,18rem); aspect-ratio:1; margin:0 auto; }
   .url { overflow-wrap:anywhere; text-align:center; color:var(--muted); font-size:.86rem; }
   button { min-height:3rem; border:1px solid var(--line); border-radius:8px; background:var(--ink); color:var(--bg); font-weight:680; cursor:pointer; }
+  #startbtn { width:min(10rem,72%); min-height:3.25rem; border-color:rgba(238,232,219,.28); background:rgba(238,232,219,.92); box-shadow:0 0 0 1px rgba(238,232,219,.04),0 1.2rem 3rem rgba(0,0,0,.26); letter-spacing:.02em; }
   .stat { text-align:center; font-size:clamp(3.6rem,7vw,6.2rem); font-weight:440; line-height:.95; font-variant-numeric:tabular-nums; }
   #meter { width:100%; height:.45rem; border:1px solid rgba(238,232,219,.08); border-radius:999px; background:var(--field); overflow:hidden; }
   #meterfill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
-  .empty { width:min(38rem,100%); padding:4rem 1.5rem; border:1px dashed var(--line); border-radius:8px; color:var(--quiet); text-align:center; }
   @media (max-width:760px) { body{overflow:auto;} #stage{grid-template-columns:1fr;padding:1.2rem;} #score{justify-content:flex-start;padding-top:2rem;} #meta{position:static;} #side{border-left:0;border-top:1px solid var(--line);padding:1rem 0 0;} }
 </style>
 </head>
@@ -50,8 +51,8 @@
   <aside id="side">
     <div class="top"><span class="label">join</span><span class="label" id="audio">audio</span></div>
     <div id="qr" class="closed"><img id="qrimg" alt="join QR" /></div>
-    <div class="url" id="joinurl">room closed</div>
-    <button id="startbtn">Open room</button>
+    <div id="qrgate"><button id="startbtn">Open</button></div>
+    <div class="url" id="joinurl"></div>
     <div><div class="stat" id="pcount">0</div><div class="label" style="text-align:center">players</div></div>
     <div style="margin-top:auto"><div class="top"><span class="label">output</span><span class="label" id="level">0%</span></div><div id="meter"><div id="meterfill"></div></div></div>
   </aside>
@@ -60,8 +61,12 @@
 const $ = s => document.querySelector(s);
 const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
 let lastUrl = "";
+let lastState = null;
+let joinOpen = false;
 function render(s) {
+  lastState = s;
   const level = Math.min(100, s.level * 300);
+  const showJoin = s.tunnel_open && joinOpen;
   $("#pcount").textContent = s.participants;
   $("#playersmeta").textContent = s.participants + " players";
   $("#voices").textContent = s.active.length + " voices";
@@ -69,10 +74,11 @@ function render(s) {
   $("#audio").textContent = s.running ? "audio on" : "audio off";
   $("#level").textContent = Math.round(level) + "%";
   $("#meterfill").style.width = level + "%";
-  $("#qr").classList.toggle("closed", !s.tunnel_open);
-  $("#joinurl").textContent = s.tunnel_open ? s.join_url.replace(/^https?:\/\//, "") : "room closed";
-  $("#startbtn").style.display = s.tunnel_open ? "none" : "block";
-  if (s.tunnel_open && s.join_url !== lastUrl) {
+  $("#qr").style.display = showJoin ? "grid" : "none";
+  $("#qrgate").style.display = showJoin ? "none" : "grid";
+  $("#joinurl").style.display = showJoin ? "block" : "none";
+  $("#joinurl").textContent = showJoin ? s.join_url.replace(/^https?:\/\//, "") : "";
+  if (showJoin && s.join_url !== lastUrl) {
     lastUrl = s.join_url;
     $("#qrimg").src = "/api/qr.png?data=" + encodeURIComponent(s.join_url) + "&t=" + Date.now();
   }
@@ -81,16 +87,16 @@ function render(s) {
   const top = [...s.active].sort((a, b) => b.weight - a.weight);
   const featured = top.slice(0, top.length > 48 ? 6 : top.length > 16 ? 8 : 10);
   const ensemble = top.slice(10, 100);
-  $("#prompts").innerHTML = featured.length ? featured.map(a => {
+  $("#prompts").innerHTML = featured.map(a => {
     const op = .42 + .58 * Math.min(1, a.weight);
     return `<div class="prompt" style="opacity:${op}"><span class="idx">${String(a.id).padStart(2,"0").slice(-2)}</span><span class="text">${esc(a.text)}</span><span class="time">${Math.ceil(a.remaining)}s</span><span class="life" style="width:${a.life_frac * 100}%"></span></div>`;
-  }).join("") : `<div class="empty">anchor only</div>`;
+  }).join("");
   $("#ensemble").innerHTML = ensemble.map(a => `<div class="cell" title="${esc(a.text)}">${esc(a.text)}</div>`).join("");
 }
 $("#startbtn").onclick = async () => {
-  $("#startbtn").textContent = "Opening...";
-  await fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"open_tunnel"})});
-  $("#startbtn").textContent = "Open room";
+  joinOpen = true;
+  if (lastState?.tunnel_open) render(lastState);
+  else await fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"open_tunnel"})});
 };
 const ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws/board");
 ws.onmessage = e => render(JSON.parse(e.data));
