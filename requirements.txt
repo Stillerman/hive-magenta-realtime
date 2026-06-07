@@ -1,0 +1,7 @@
+# Magenta RealTime 2 (MLX backend) + the Hive server.
+magenta-rt[mlx]
+fastapi
+uvicorn[standard]
+sounddevice
+qrcode[pil]
+websockets

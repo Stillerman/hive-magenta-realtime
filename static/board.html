@@ -1,0 +1,100 @@
+<!doctype html>
+<!-- Copyright 2026 Google LLC. Apache-2.0. Minimal no-build board fallback. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hive - Board</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b0b09; --ink:#eee8db; --muted:#9d9688; --quiet:#6f695e; --line:rgba(238,232,219,.14); --field:rgba(238,232,219,.045); --accent:#d7c9a2; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; }
+  #stage { display:grid; grid-template-columns:minmax(0,1fr) minmax(18rem,24vw); gap:2rem; height:100vh; padding:2rem 3rem; }
+  #score { position:relative; display:flex; flex-direction:column; justify-content:center; gap:.55rem; min-width:0; min-height:0; }
+  h1 { margin:.25rem 0 0; font-size:clamp(3rem,5vw,5.8rem); font-weight:520; line-height:.95; letter-spacing:0; }
+  .eyebrow,.label,#meta { color:var(--muted); font-size:.72rem; font-weight:650; letter-spacing:.13em; text-transform:uppercase; }
+  #meta { position:absolute; top:6.5rem; left:0; display:flex; gap:.8rem; color:var(--quiet); }
+  #anchorbox,.prompt { width:min(72rem,100%); border:1px solid rgba(238,232,219,.08); border-radius:8px; background:rgba(11,11,9,.54); }
+  #anchorbox { display:none; grid-template-columns:6rem 1fr; gap:1rem; padding:.9rem 1rem; }
+  .prompt { position:relative; display:grid; grid-template-columns:3.2rem minmax(0,1fr) auto; align-items:center; gap:.75rem; min-height:3rem; padding:.55rem .8rem; overflow:hidden; contain:layout paint; }
+  .prompt::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); opacity:.7; }
+  .idx,.time { color:var(--quiet); font-size:.8rem; letter-spacing:.08em; font-variant-numeric:tabular-nums; text-transform:uppercase; }
+  .text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:clamp(1rem,1.8vw,1.7rem); line-height:1.05; }
+  .life { position:absolute; left:0; bottom:0; height:2px; background:var(--ink); opacity:.34; }
+  #ensemble { display:grid; grid-template-columns:repeat(auto-fill,minmax(6.4rem,1fr)); grid-auto-rows:1.8rem; gap:.35rem; width:min(72rem,100%); max-height:min(14rem,25vh); overflow:hidden; }
+  .cell { position:relative; min-width:0; border:1px solid rgba(238,232,219,.1); border-radius:6px; background:var(--field); color:var(--muted); padding:0 .45rem; overflow:hidden; line-height:1.7rem; font-size:.78rem; text-overflow:ellipsis; white-space:nowrap; }
+  #side { display:flex; flex-direction:column; gap:1rem; min-height:0; padding-left:1.6rem; border-left:1px solid var(--line); }
+  .top { display:flex; justify-content:space-between; gap:1rem; }
+  #qr { display:grid; place-items:center; width:min(100%,18rem); aspect-ratio:1; margin:0 auto; padding:.8rem; background:#f5f0e7; border:1px solid var(--line); border-radius:8px; }
+  #qr.closed { background:transparent; border-style:dashed; }
+  #qr img { width:100%; height:100%; image-rendering:pixelated; }
+  .url { overflow-wrap:anywhere; text-align:center; color:var(--muted); font-size:.86rem; }
+  button { min-height:3rem; border:1px solid var(--line); border-radius:8px; background:var(--ink); color:var(--bg); font-weight:680; cursor:pointer; }
+  .stat { text-align:center; font-size:clamp(3.6rem,7vw,6.2rem); font-weight:440; line-height:.95; font-variant-numeric:tabular-nums; }
+  #meter { width:100%; height:.45rem; border:1px solid rgba(238,232,219,.08); border-radius:999px; background:var(--field); overflow:hidden; }
+  #meterfill { height:100%; width:0; background:var(--accent); transition:width .1s linear; }
+  .empty { width:min(38rem,100%); padding:4rem 1.5rem; border:1px dashed var(--line); border-radius:8px; color:var(--quiet); text-align:center; }
+  @media (max-width:760px) { body{overflow:auto;} #stage{grid-template-columns:1fr;padding:1.2rem;} #score{justify-content:flex-start;padding-top:2rem;} #meta{position:static;} #side{border-left:0;border-top:1px solid var(--line);padding:1rem 0 0;} }
+</style>
+</head>
+<body>
+<div id="stage">
+  <main id="score">
+    <div class="eyebrow">group instrument</div>
+    <h1>Hive</h1>
+    <div id="meta"><span id="voices">0 voices</span><span id="playersmeta">0 players</span><span id="speed">0 steps/s</span></div>
+    <div id="anchorbox"><span class="label">anchor</span><span id="anchor"></span></div>
+    <div id="prompts"></div>
+    <div id="ensemble"></div>
+  </main>
+  <aside id="side">
+    <div class="top"><span class="label">join</span><span class="label" id="audio">audio</span></div>
+    <div id="qr" class="closed"><img id="qrimg" alt="join QR" /></div>
+    <div class="url" id="joinurl">room closed</div>
+    <button id="startbtn">Open room</button>
+    <div><div class="stat" id="pcount">0</div><div class="label" style="text-align:center">players</div></div>
+    <div style="margin-top:auto"><div class="top"><span class="label">output</span><span class="label" id="level">0%</span></div><div id="meter"><div id="meterfill"></div></div></div>
+  </aside>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+let lastUrl = "";
+function render(s) {
+  const level = Math.min(100, s.level * 300);
+  $("#pcount").textContent = s.participants;
+  $("#playersmeta").textContent = s.participants + " players";
+  $("#voices").textContent = s.active.length + " voices";
+  $("#speed").textContent = Math.round(s.steps_per_s) + " steps/s";
+  $("#audio").textContent = s.running ? "audio on" : "audio off";
+  $("#level").textContent = Math.round(level) + "%";
+  $("#meterfill").style.width = level + "%";
+  $("#qr").classList.toggle("closed", !s.tunnel_open);
+  $("#joinurl").textContent = s.tunnel_open ? s.join_url.replace(/^https?:\/\//, "") : "room closed";
+  $("#startbtn").style.display = s.tunnel_open ? "none" : "block";
+  if (s.tunnel_open && s.join_url !== lastUrl) {
+    lastUrl = s.join_url;
+    $("#qrimg").src = "/api/qr.png?data=" + encodeURIComponent(s.join_url) + "&t=" + Date.now();
+  }
+  $("#anchorbox").style.display = s.anchor && !s.active.length ? "grid" : "none";
+  $("#anchor").textContent = s.anchor || "";
+  const top = [...s.active].sort((a, b) => b.weight - a.weight);
+  const featured = top.slice(0, top.length > 48 ? 6 : top.length > 16 ? 8 : 10);
+  const ensemble = top.slice(10, 100);
+  $("#prompts").innerHTML = featured.length ? featured.map(a => {
+    const op = .42 + .58 * Math.min(1, a.weight);
+    return `<div class="prompt" style="opacity:${op}"><span class="idx">${String(a.id).padStart(2,"0").slice(-2)}</span><span class="text">${esc(a.text)}</span><span class="time">${Math.ceil(a.remaining)}s</span><span class="life" style="width:${a.life_frac * 100}%"></span></div>`;
+  }).join("") : `<div class="empty">anchor only</div>`;
+  $("#ensemble").innerHTML = ensemble.map(a => `<div class="cell" title="${esc(a.text)}">${esc(a.text)}</div>`).join("");
+}
+$("#startbtn").onclick = async () => {
+  $("#startbtn").textContent = "Opening...";
+  await fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"open_tunnel"})});
+  $("#startbtn").textContent = "Open room";
+};
+const ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws/board");
+ws.onmessage = e => render(JSON.parse(e.data));
+ws.onclose = () => setInterval(async () => render(await (await fetch("/api/state")).json()), 250);
+</script>
+</body>
+</html>

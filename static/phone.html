@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- Copyright 2026 Google LLC. Apache-2.0. Minimal no-build phone fallback. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Hive - Play</title>
+<style>
+  :root { color-scheme:dark; --bg:#0b0b09; --ink:#eee8db; --muted:#9d9688; --quiet:#6f695e; --line:rgba(238,232,219,.14); --field:rgba(238,232,219,.045); --strong:rgba(238,232,219,.08); --accent:#d7c9a2; --good:#9fb5aa; --warn:#c18466; }
+  * { box-sizing:border-box; }
+  body { margin:0 auto; width:min(100%,40rem); height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:.8rem; overflow:hidden; padding:max(.7rem,env(safe-area-inset-top)) .85rem max(.75rem,env(safe-area-inset-bottom)); font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  .eyebrow,.section,label span { color:var(--muted); font-size:.72rem; font-weight:650; letter-spacing:.13em; text-transform:uppercase; }
+  h1 { margin:0; font-size:clamp(1.2rem,6.4vw,1.9rem); font-weight:520; line-height:1; letter-spacing:0; }
+  main { display:grid; grid-template-rows:minmax(0,1fr) auto; gap:.8rem; min-height:0; overflow:hidden; }
+  .room { display:grid; place-items:center; border:1px dashed var(--line); border-radius:8px; color:var(--quiet); font-size:.9rem; }
+  form { display:grid; grid-template-columns:minmax(0,1fr) 4.2rem; gap:.45rem; }
+  input { width:100%; min-width:0; height:3rem; padding:0 .85rem; border:1px solid var(--line); border-radius:8px; background:var(--field); color:var(--ink); font:inherit; font-size:1rem; outline:none; }
+  input:focus { border-color:rgba(238,232,219,.34); background:var(--strong); }
+  input::placeholder { color:var(--quiet); }
+  button { min-height:2.7rem; border:1px solid var(--line); border-radius:8px; background:var(--field); color:var(--ink); font:inherit; cursor:pointer; }
+  form button { height:3rem; padding:0; background:var(--ink); color:var(--bg); font-weight:680; }
+  #toast { min-height:1.05rem; color:var(--quiet); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.78rem; }
+  .chips { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; }
+  .chip { min-height:2.35rem; padding:0 .62rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.88rem; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Hive</h1>
+  </header>
+  <main>
+    <div class="room">add a voice to the room</div>
+    <section>
+      <div class="section">presets</div>
+      <div class="chips" id="chips"></div>
+    </section>
+  </main>
+  <footer>
+    <div id="toast"></div>
+    <form id="f">
+      <input id="t" autocomplete="off" placeholder="add a style" maxlength="80" />
+      <button type="submit">Send</button>
+    </form>
+  </footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const cid = localStorage.cid || (localStorage.cid = Math.random().toString(36).slice(2));
+const SUGGEST = ["deep house","ambient pads","sub bass","church organ","disco funk","lo-fi hip hop",
+  "trap drums","flamenco guitar","jazz saxophone","gospel choir","drum and bass","sitar",
+  "808 bass","steel drums","gregorian chant","synthwave","minimal techno","warm rhodes"];
+let seed = Math.floor(Math.random() * SUGGEST.length);
+function renderPresets() {
+  $("#chips").innerHTML = Array.from({length: 6}, (_, i) => SUGGEST[(seed + i * 3) % SUGGEST.length])
+    .map(s => `<button class="chip" type="button">${s}</button>`).join("");
+}
+renderPresets();
+$("#chips").onclick = e => { if (e.target.classList.contains("chip")) send(e.target.textContent); };
+async function send(text) {
+  if (!text) return;
+  const r = await fetch("/api/prompt", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({text, client_id: cid})});
+  const d = await r.json();
+  const toast = $("#toast");
+  if (d.ok) { toast.style.color="var(--good)"; toast.textContent = `"${text}" entered the mix`; $("#t").value=""; seed = (seed + 5) % SUGGEST.length; renderPresets(); }
+  else { toast.style.color="var(--warn)"; toast.textContent = d.message || "Try again."; }
+}
+$("#f").onsubmit = e => { e.preventDefault(); send($("#t").value.trim()); };
+setInterval(() => fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"},
+  body: JSON.stringify({client_id: cid})}), 5000);
+</script>
+</body>
+</html>
