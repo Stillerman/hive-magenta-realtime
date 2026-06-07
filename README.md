@@ -40,7 +40,7 @@ Click **Start · Open the Room** to open a public Cloudflare tunnel — the QR c
 
 ```bash
 npm --prefix ui run dev                 # Vite dev server on :5173, proxies to :8000
-.venv/bin/python -m pytest tests        # mixer unit tests
+uv pip install pytest && .venv/bin/python -m pytest tests   # mixer unit tests
 .venv/bin/python -m server._smoke       # offline morph test -> /tmp/hive_morph.wav
 ```
 
